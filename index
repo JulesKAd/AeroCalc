@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AeroCalc - Masse & Centrage</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ios: {
+                            bg: '#f2f2f7',
+                            card: '#ffffff',
+                            blue: '#007aff',
+                            blueHover: '#005bb5',
+                            text: '#000000',
+                            textDim: '#8e8e93',
+                            border: '#c6c6c8',
+                            red: '#ff3b30',
+                            orange: '#ff9500',
+                            green: '#34c759'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Helvetica', 'Arial', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #f2f2f7; color: #000; -webkit-font-smoothing: antialiased; }
+        .ios-list { background-color: #fff; border-top: 1px solid #c6c6c8; border-bottom: 1px solid #c6c6c8; }
+        .ios-list-item { border-bottom: 1px solid #e5e5ea; }
+        .ios-list-item:last-child { border-bottom: none; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        input[type="number"] { -moz-appearance: textfield; }
+        input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .spinner { border: 4px solid rgba(0,0,0,0.1); border-left-color: #007aff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col pb-12">
+
+    <!-- Header / Navbar -->
+    <header class="bg-white border-b border-ios-border sticky top-0 z-40 px-4 py-3 flex justify-between items-center shadow-sm">
+        <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold tracking-tight text-ios-text">AeroCalc</h1>
+        </div>
+        <div class="flex items-center gap-2">
+            <select id="aircraftSelect" class="bg-ios-bg border border-ios-border text-ios-blue font-semibold rounded-lg px-3 py-1.5 outline-none focus:ring-2 focus:ring-ios-blue text-sm">
+            </select>
+            <button onclick="openProfileModal()" class="text-ios-blue p-2 text-xl hover:opacity-70 transition-opacity" title="Paramètres">
+                <i class="fa-solid fa-gear"></i>
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto w-full p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+        
+        <!-- Colonne Gauche : Saisie -->
+        <div class="lg:col-span-5 space-y-6">
+            
+            <div>
+                <div class="flex justify-between items-end mb-2 px-2">
+                    <h2 class="text-sm font-semibold text-ios-textDim uppercase tracking-wider">Chargement</h2>
+                    <span id="aircraftNameDisplay" class="text-xs font-semibold text-ios-textDim"></span>
+                </div>
+                <div class="ios-list rounded-lg overflow-hidden border-x border-ios-border" id="stationsContainer"></div>
+            </div>
+
+            <!-- Paramètres de Performance (Conditions) -->
+            <div>
+                <div class="flex justify-between items-end mb-2 px-2">
+                    <h2 class="text-sm font-semibold text-ios-textDim uppercase tracking-wider">Conditions du jour</h2>
+                </div>
+                <div class="ios-list rounded-lg overflow-hidden border-x border-ios-border">
+                    <div class="flex items-center p-3 ios-list-item bg-white">
+                        <label class="w-1/3 text-sm font-medium">Piste</label>
+                        <select id="condRunway" class="w-1/3 bg-transparent text-ios-blue font-medium outline-none text-right" onchange="onRunwaySelected()">
+                            <option value="manual">Manuelle</option>
+                        </select>
+                        <select id="condQfu" class="w-1/3 bg-transparent text-ios-blue font-medium outline-none text-right" onchange="onQfuSelected()" style="display:none;">
+                        </select>
+                    </div>
+                    <div class="flex items-center p-3 ios-list-item bg-white">
+                        <label class="w-1/2 text-sm font-medium">Altitude Zp (ft)</label>
+                        <input type="number" step="100" id="condAlt" value="0" class="w-1/2 text-right text-lg font-medium outline-none bg-transparent">
+                    </div>
+                    <div class="flex items-center p-3 ios-list-item bg-white">
+                        <label class="w-1/2 text-sm font-medium">Température (°C)</label>
+                        <input type="number" step="1" id="condTemp" value="15" class="w-1/2 text-right text-lg font-medium outline-none bg-transparent">
+                    </div>
+                    <div class="flex items-center p-3 ios-list-item bg-white">
+                        <label class="w-1/2 text-sm font-medium">Vent Face (kt) <br><span class="text-[10px] text-ios-textDim font-normal">- négatif si vent dos</span></label>
+                        <input type="number" step="1" id="condWind" value="0" class="w-1/2 text-right text-lg font-medium outline-none bg-transparent">
+                    </div>
+                    <div class="flex items-center p-3 ios-list-item bg-white">
+                        <label class="w-1/2 text-sm font-medium">Surface</label>
+                        <select id="condSurface" class="w-1/2 text-right bg-transparent text-ios-blue font-medium outline-none" dir="rtl">
+                            <option value="dur">Piste en Dur</option>
+                            <option value="herbe">Piste en Herbe</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center p-3 bg-white">
+                        <label class="w-1/2 text-sm font-medium">Pente (%) <br><span class="text-[10px] text-ios-textDim font-normal">+ montée / - descente</span></label>
+                        <input type="number" step="0.5" id="condSlope" value="0" class="w-1/2 text-right text-lg font-medium outline-none bg-transparent">
+                    </div>
+                </div>
+            </div>
+
+            <button id="computeBtn" onclick="simulateCompute()" class="w-full bg-ios-blue hover:bg-ios-blueHover text-white font-semibold text-lg py-3.5 rounded-xl shadow-sm transition-colors flex justify-center items-center gap-2 active:scale-95 duration-150">
+                <i class="fa-solid fa-calculator"></i> Calculer le centrage
+            </button>
+
+        </div>
+
+        <!-- Colonne Droite : Résultats (Graphique & Tableau) -->
+        <div class="lg:col-span-7 relative">
+            
+            <div id="loadingOverlay" class="absolute inset-0 bg-ios-bg/80 backdrop-blur-sm z-10 flex flex-col justify-center items-center rounded-xl hidden">
+                <div class="spinner mb-4"></div>
+                <p class="text-ios-textDim font-semibold">Calcul en cours...</p>
+            </div>
+
+            <div id="resultsContainer" class="space-y-6 opacity-50 pointer-events-none transition-opacity duration-300">
+                
+                <div id="statusBanner" class="bg-white border border-ios-border rounded-xl p-4 flex items-center gap-4">
+                    <div id="statusIcon" class="text-3xl text-ios-textDim"><i class="fa-solid fa-circle-minus"></i></div>
+                    <div>
+                        <h3 id="statusTitle" class="font-bold text-ios-text">En attente</h3>
+                        <p id="statusMessage" class="text-sm text-ios-textDim">Cliquez sur calculer pour vérifier le centrage.</p>
+                    </div>
+                </div>
+
+                <div class="bg-white border border-ios-border rounded-xl p-4 flex flex-col">
+                    <h2 class="text-sm font-semibold text-ios-textDim uppercase tracking-wider mb-4">Enveloppe de vol</h2>
+                    <div class="w-full relative" style="height: 400px; min-height: 400px;">
+                        <canvas id="cgChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white border border-ios-border rounded-xl overflow-hidden">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-ios-bg text-ios-textDim text-xs uppercase border-b border-ios-border">
+                            <tr>
+                                <th class="px-4 py-2 font-semibold">Désignation</th>
+                                <th class="px-4 py-2 text-right font-semibold">Masse (kg)</th>
+                                <th class="px-4 py-2 text-right font-semibold hidden sm:table-cell">Bras (m)</th>
+                                <th class="px-4 py-2 text-right font-semibold hidden sm:table-cell">Moment</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryTableBody" class="divide-y divide-gray-100"></tbody>
+                        <tfoot class="bg-ios-bg border-t border-ios-border">
+                            <tr>
+                                <td class="px-4 py-2 font-medium text-ios-textDim">ZFW (Zéro Carburant)</td>
+                                <td class="px-4 py-2 text-right font-medium text-ios-textDim" id="zfwMass">0.0</td>
+                                <td class="px-4 py-2 text-right text-ios-textDim hidden sm:table-cell" id="zfwArm">0.000</td>
+                                <td class="px-4 py-2 text-right text-ios-textDim hidden sm:table-cell" id="zfwMoment">0.0</td>
+                            </tr>
+                            <tr class="border-t border-ios-border">
+                                <td class="px-4 py-3 font-bold text-ios-text">TOW (Décollage)</td>
+                                <td class="px-4 py-3 text-right font-bold text-ios-text" id="towMass">0.0</td>
+                                <td class="px-4 py-3 text-right font-semibold text-ios-blue hidden sm:table-cell" id="towArm">0.000</td>
+                                <td class="px-4 py-3 text-right font-semibold text-ios-text hidden sm:table-cell" id="towMoment">0.0</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- Bilan Performances (Atterrissage / Décollage) -->
+                <div id="perfResultsContainer" class="bg-white border border-ios-border rounded-xl p-4 flex flex-col hidden">
+                    
+                    <!-- Ligne supérieure avec Tps de vol et Panne Volets -->
+                    <div class="flex flex-wrap justify-between items-center mb-5 gap-3 border-b border-ios-border pb-3">
+                        <div class="flex items-center gap-2">
+                            <label class="text-xs font-bold text-ios-textDim uppercase">Tps de vol (h):</label>
+                            <input type="number" step="0.1" id="condFlightTime" value="1.0" class="w-16 text-center bg-gray-100 border border-gray-200 rounded py-1 text-sm font-bold outline-none text-ios-blue" onchange="invalidateResults()">
+                        </div>
+                        <div class="flex items-center gap-2 bg-orange-50 px-3 py-1 rounded border border-orange-100">
+                            <input type="checkbox" id="chkFlapsFail" class="w-4 h-4 accent-ios-orange cursor-pointer" onchange="calculate()">
+                            <label for="chkFlapsFail" class="text-xs font-bold text-ios-orange cursor-pointer">Panne Volets (+30% LDG)</label>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Takeoff -->
+                        <div class="bg-blue-50 border border-blue-100 rounded-lg p-3 relative">
+                            <div class="absolute top-2 right-2 text-[10px] text-ios-blue font-bold bg-blue-100 px-1.5 py-0.5 rounded" id="infoTowMass"></div>
+                            <h3 class="text-xs font-bold text-ios-blue uppercase mb-2"><i class="fa-solid fa-plane-departure"></i> Décollage</h3>
+                            <div class="flex justify-between items-center border-b border-blue-200 pb-1 mb-1">
+                                <span class="text-sm text-ios-textDim">Roulage</span>
+                                <span class="text-lg font-bold text-ios-text" id="resTkofRoll">-- m</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-ios-textDim">Passage 15m</span>
+                                <span class="text-lg font-bold text-ios-blue" id="resTkofClear">-- m</span>
+                            </div>
+                        </div>
+                        <!-- Landing -->
+                        <div class="bg-green-50 border border-green-100 rounded-lg p-3 relative">
+                            <div class="absolute top-2 right-2 text-[10px] text-ios-green font-bold bg-green-100 px-1.5 py-0.5 rounded" id="infoLdgMass"></div>
+                            <h3 class="text-xs font-bold text-ios-green uppercase mb-2"><i class="fa-solid fa-plane-arrival"></i> Atterrissage</h3>
+                            <div class="flex justify-between items-center border-b border-green-200 pb-1 mb-1">
+                                <span class="text-sm text-ios-textDim">Roulage</span>
+                                <span class="text-lg font-bold text-ios-text" id="resLdgRoll">-- m</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-ios-textDim">Passage 15m</span>
+                                <span class="text-lg font-bold text-ios-green" id="resLdgClear">-- m</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Visualiseur de Piste Graphique -->
+                    <div id="runwayVisualizer" class="mt-5 pt-4 hidden">
+                        <div class="flex justify-between items-end mb-4 px-1 border-b border-ios-border pb-2">
+                            <h3 class="text-sm font-bold text-ios-text uppercase"><i class="fa-solid fa-road text-ios-textDim mr-2"></i>Visuel <span id="visuRwName" class="text-ios-blue">--</span></h3>
+                        </div>
+                        
+                        <div class="space-y-6">
+                            
+                            <!-- DÉCOLLAGE VISUAL -->
+                            <div>
+                                <h4 class="text-xs font-bold text-ios-textDim mb-1 uppercase">Décollage</h4>
+                                <div class="relative w-full h-24 border border-ios-border rounded bg-white overflow-hidden shadow-sm">
+                                    <!-- Piste -->
+                                    <div class="absolute top-1/2 left-4 right-4 h-10 -mt-5 bg-[#334155] rounded-sm flex items-center justify-between px-2 text-white shadow-inner">
+                                        <div id="visuRwNumTkof" class="text-sm font-bold font-mono transform -rotate-90">08</div>
+                                        <div class="flex-1 h-0 border-t-2 border-dashed border-white/60 mx-3"></div>
+                                    </div>
+                                    
+                                    <!-- Dimension TODA -->
+                                    <div class="absolute top-1 left-4 right-4 border-x border-t border-slate-300 h-2"></div>
+                                    <div class="absolute top-0 w-full text-center text-[9px] font-bold text-slate-500 bg-white/80 max-w-max mx-auto px-1 transform translate-x-1/2" style="right: 50%;">TODA: <span id="valToda">--</span>m</div>
+
+                                    <!-- Barre Roulage -->
+                                    <div id="barTkofRoll" class="absolute top-1/2 left-4 h-6 -mt-3 bg-ios-blue/70 border-r-2 border-ios-blue transition-all z-10 flex items-center overflow-hidden" style="width: 0%;">
+                                        <span class="ml-1 text-white text-[9px] font-bold drop-shadow-md">Roul.</span>
+                                    </div>
+
+                                    <!-- Dimension 15m -->
+                                    <div id="dimTkofClear" class="absolute bottom-4 left-4 border-x border-b border-ios-blue h-2 transition-all z-20" style="width: 0%;"></div>
+                                    <div id="txtTkofClear" class="absolute bottom-0 text-[10px] font-bold text-ios-blue transition-all whitespace-nowrap text-center transform -translate-x-1/2" style="left: 1rem;">--</div>
+                                </div>
+                            </div>
+
+                            <!-- ATTERRISSAGE VISUAL -->
+                            <div>
+                                <h4 class="text-xs font-bold text-ios-textDim mb-1 uppercase">Atterrissage</h4>
+                                <div class="relative w-full h-24 border border-ios-border rounded bg-white overflow-hidden shadow-sm">
+                                    <!-- Piste -->
+                                    <div class="absolute top-1/2 left-4 right-4 h-10 -mt-5 bg-[#334155] rounded-sm flex items-center justify-between px-2 text-white shadow-inner">
+                                        <div id="visuRwNumLdg" class="text-sm font-bold font-mono transform -rotate-90">08</div>
+                                        <div class="flex-1 h-0 border-t-2 border-dashed border-white/60 mx-3"></div>
+                                    </div>
+                                    
+                                    <!-- Dimension LDA -->
+                                    <div class="absolute top-1 left-4 right-4 border-x border-t border-slate-300 h-2"></div>
+                                    <div class="absolute top-0 w-full text-center text-[9px] font-bold text-slate-500 bg-white/80 max-w-max mx-auto px-1 transform translate-x-1/2" style="right: 50%;">LDA: <span id="valLda">--</span>m</div>
+
+                                    <!-- Barre Roulage -->
+                                    <div id="barLdgRoll" class="absolute top-1/2 left-4 h-6 -mt-3 bg-ios-green/70 border-r-2 border-ios-green transition-all z-10 flex items-center overflow-hidden" style="width: 0%;">
+                                        <span class="ml-1 text-white text-[9px] font-bold drop-shadow-md">Roul.</span>
+                                    </div>
+
+                                    <!-- Dimension 15m -->
+                                    <div id="dimLdgClear" class="absolute bottom-4 left-4 border-x border-b border-ios-green h-2 transition-all z-20" style="width: 0%;"></div>
+                                    <div id="txtLdgClear" class="absolute bottom-0 text-[10px] font-bold text-ios-green transition-all whitespace-nowrap text-center transform -translate-x-1/2" style="left: 1rem;">--</div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL : Gestion Profils (Style iOS Sheet) -->
+    <div id="profileModal" class="fixed inset-0 bg-black/40 z-50 hidden flex justify-center items-end sm:items-center sm:p-4 backdrop-blur-sm">
+        <div class="bg-ios-bg w-full sm:max-w-4xl sm:rounded-2xl h-[95vh] sm:h-[90vh] flex flex-col shadow-2xl rounded-t-2xl transform transition-transform">
+            
+            <div class="flex justify-between items-center p-4 border-b border-ios-border bg-white sm:rounded-t-2xl shrink-0">
+                <button onclick="closeProfileModal()" class="text-ios-blue text-lg hover:opacity-70">Fermer</button>
+                
+                <!-- TABS DU MODAL -->
+                <div class="flex bg-ios-bg rounded-lg p-1 overflow-x-auto hide-scrollbar max-w-[55vw]">
+                    <button id="tabBtnAc" onclick="switchModalTab('ac')" class="px-3 py-1.5 text-sm font-semibold rounded-md bg-white shadow text-ios-text transition-all whitespace-nowrap">Aéronefs</button>
+                    <button id="tabBtnPerf" onclick="switchModalTab('perf')" class="px-3 py-1.5 text-sm font-semibold rounded-md text-ios-textDim hover:text-ios-text transition-all whitespace-nowrap">Performances</button>
+                    <button id="tabBtnRw" onclick="switchModalTab('rw')" class="px-3 py-1.5 text-sm font-semibold rounded-md text-ios-textDim hover:text-ios-text transition-all whitespace-nowrap">Pistes</button>
+                    <button id="tabBtnData" onclick="switchModalTab('data')" class="px-3 py-1.5 text-sm font-semibold rounded-md text-ios-textDim hover:text-ios-text transition-all whitespace-nowrap">Données</button>
+                </div>
+
+                <button onclick="saveCurrentModalTab()" class="text-ios-blue text-lg font-bold hover:opacity-70">Enregistrer</button>
+            </div>
+            
+            <div class="p-4 overflow-y-auto flex-grow hide-scrollbar">
+                
+                <!-- ================= ONGLET AERONEF ================= -->
+                <div id="tabAc" class="space-y-6">
+                    <div class="flex gap-2 mb-2">
+                        <select id="acProfileSelect" class="flex-1 bg-white border border-ios-border text-ios-blue py-2 px-3 rounded-lg font-medium shadow-sm outline-none" onchange="loadProfileIntoForm(this.value)"></select>
+                        <button onclick="createNewProfile()" class="bg-white border border-ios-border text-ios-blue px-4 py-2 rounded-lg font-medium shadow-sm active:bg-gray-50" title="Nouvel aéronef"><i class="fa-solid fa-plus"></i></button>
+                        <button onclick="deleteCurrentProfile()" id="btnDeleteProfile" class="bg-white border border-ios-border text-ios-red px-4 py-2 rounded-lg font-medium shadow-sm active:bg-gray-50" title="Supprimer cet aéronef"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+
+                    <form id="aircraftForm" class="space-y-6">
+                        <div>
+                            <h3 class="text-xs font-semibold text-ios-textDim uppercase ml-2 mb-1">Informations Générales</h3>
+                            <div class="ios-list rounded-lg overflow-hidden border-x border-ios-border">
+                                <div class="flex items-center p-3 ios-list-item bg-white">
+                                    <label class="w-1/3 text-sm font-medium">Immatriculation</label>
+                                    <input type="text" id="editReg" class="w-2/3 text-right outline-none bg-transparent" required>
+                                </div>
+                                <div class="flex items-center p-3 ios-list-item bg-white">
+                                    <label class="w-1/2 text-sm font-medium text-ios-blue"><i class="fa-solid fa-link mr-1"></i> Modèle (Perfos)</label>
+                                    <select id="editModelId" class="w-1/2 text-right outline-none bg-transparent text-ios-blue font-medium" dir="rtl"></select>
+                                </div>
+                                <div class="flex items-center p-3 ios-list-item bg-white">
+                                    <label class="w-1/2 text-sm font-medium">Masse à vide (kg)</label>
+                                    <input type="number" step="0.1" id="editEmptyMass" class="w-1/2 text-right outline-none bg-transparent" required>
+                                </div>
+                                <div class="flex items-center p-3 ios-list-item bg-white">
+                                    <label class="w-1/2 text-sm font-medium">Bras à vide (m)</label>
+                                    <input type="number" step="0.001" id="editEmptyArm" class="w-1/2 text-right outline-none bg-transparent" required>
+                                </div>
+                                <div class="flex items-center p-3 ios-list-item bg-white">
+                                    <label class="w-1/2 text-sm font-medium">Masse Max (kg)</label>
+                                    <input type="number" step="1" id="editMaxMass" class="w-1/2 text-right outline-none bg-transparent" required>
+                                </div>
+                                <div class="flex items-center p-3 ios-list-item bg-white">
+                                    <label class="w-1/2 text-sm font-medium">Densité Carb. (kg/L)</label>
+                                    <input type="number" step="0.01" id="editFuelDensity" class="w-1/2 text-right outline-none bg-transparent text-ios-textDim" required>
+                                </div>
+                                <div class="flex items-center p-3 bg-white">
+                                    <label class="w-1/2 text-sm font-medium text-ios-orange">Consommation (L/h)</label>
+                                    <input type="number" step="0.1" id="editFuelConso" class="w-1/2 text-right outline-none bg-transparent text-ios-orange font-bold" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-end mb-1 px-2">
+                                <h3 class="text-xs font-semibold text-ios-textDim uppercase">Stations (Sièges, Soutes...)</h3>
+                                <button type="button" onclick="addStationRow()" class="text-ios-blue text-sm font-medium"><i class="fa-solid fa-plus"></i> Ajouter</button>
+                            </div>
+                            <div class="ios-list rounded-lg overflow-hidden border-x border-ios-border" id="editStationsList"></div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-end mb-1 px-2">
+                                <h3 class="text-xs font-semibold text-ios-textDim uppercase">Points Enveloppe</h3>
+                                <button type="button" onclick="addEnvelopeRow()" class="text-ios-blue text-sm font-medium"><i class="fa-solid fa-plus"></i> Ajouter</button>
+                            </div>
+                            <div class="ios-list rounded-lg overflow-hidden border-x border-ios-border" id="editEnvelopeList"></div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- ================= ONGLET PERFORMANCES ================= -->
+                <div id="tabPerf" class="hidden space-y-6">
+                    <div class="flex gap-2 mb-2">
+                        <select id="perfModelSelect" class="flex-1 bg-white border border-ios-border text-ios-blue py-2 px-3 rounded-lg font-medium shadow-sm outline-none" onchange="loadPerfProfile(this.value)"></select>
+                        <button onclick="createNewPerfProfile()" class="bg-white border border-ios-border text-ios-blue px-4 py-2 rounded-lg font-medium shadow-sm active:bg-gray-50"><i class="fa-solid fa-plus"></i></button>
+                        <button onclick="deletePerfProfile()" id="btnDeletePerf" class="bg-white border border-ios-border text-ios-red px-4 py-2 rounded-lg font-medium shadow-sm active:bg-gray-50"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    <form id="perfForm" class="space-y-6">
+                        <div>
+                            <h3 class="text-xs font-semibold text-ios-textDim uppercase ml-2 mb-1">Modèle Aérodynamique</h3>
+                            <div class="ios-list rounded-lg overflow-hidden border-x border-ios-border">
+                                <div class="flex items-center p-3 bg-white">
+                                    <label class="w-1/3 text-sm font-medium">Nom du modèle</label>
+                                    <input type="text" id="editPerfName" placeholder="ex: DR400 120" class="w-2/3 text-right outline-none bg-transparent font-medium" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-xs font-semibold text-ios-textDim uppercase ml-2 mb-1">Facteurs (Multiplicateurs / % ajoutés)</h3>
+                            <div class="ios-list rounded-lg overflow-hidden border-x border-ios-border text-sm">
+                                <div class="flex items-center p-2 ios-list-item bg-gray-100 font-semibold text-ios-textDim">
+                                    <div class="w-1/3">Condition</div><div class="w-1/3 text-center">Décollage</div><div class="w-1/3 text-center">Atterrissage</div>
+                                </div>
+                                <div class="flex items-center p-2 ios-list-item bg-white">
+                                    <label class="w-1/3 font-medium text-xs">Vent face 10kt (x)</label>
+                                    <input type="number" step="0.01" id="tkofHw10" class="w-1/3 text-center outline-none bg-transparent" required>
+                                    <input type="number" step="0.01" id="ldgHw10" class="w-1/3 text-center outline-none bg-transparent border-l border-ios-border" required>
+                                </div>
+                                <div class="flex items-center p-2 ios-list-item bg-white">
+                                    <label class="w-1/3 font-medium text-xs">Vent face 20kt (x)</label>
+                                    <input type="number" step="0.01" id="tkofHw20" class="w-1/3 text-center outline-none bg-transparent" required>
+                                    <input type="number" step="0.01" id="ldgHw20" class="w-1/3 text-center outline-none bg-transparent border-l border-ios-border" required>
+                                </div>
+                                <div class="flex items-center p-2 ios-list-item bg-white">
+                                    <label class="w-1/3 font-medium text-xs">Vent face 30kt (x)</label>
+                                    <input type="number" step="0.01" id="tkofHw30" class="w-1/3 text-center outline-none bg-transparent" required>
+                                    <input type="number" step="0.01" id="ldgHw30" class="w-1/3 text-center outline-none bg-transparent border-l border-ios-border" required>
+                                </div>
+                                <div class="flex items-center p-2 ios-list-item bg-white">
+                                    <label class="w-1/3 font-medium text-xs">Vent dos (+% / 2kt)</label>
+                                    <input type="number" step="1" id="tkofTw" class="w-1/3 text-center outline-none bg-transparent text-ios-red" required>
+                                    <input type="number" step="1" id="ldgTw" class="w-1/3 text-center outline-none bg-transparent border-l border-ios-border text-ios-red" required>
+                                </div>
+                                <div class="flex items-center p-2 ios-list-item bg-white">
+                                    <label class="w-1/3 font-medium text-xs">Herbe (+%)</label>
+                                    <input type="number" step="1" id="tkofGrass" class="w-1/3 text-center outline-none bg-transparent text-ios-orange" required>
+                                    <input type="number" step="1" id="ldgGrass" class="w-1/3 text-center outline-none bg-transparent border-l border-ios-border text-ios-orange" required>
+                                </div>
+                                <div class="flex items-center p-2 bg-white">
+                                    <label class="w-1/3 font-medium text-xs">Pente 2% (+%)</label>
+                                    <input type="number" step="1" id="tkofSlope" class="w-1/3 text-center outline-none bg-transparent text-ios-orange" required>
+                                    <input type="number" step="1" id="ldgSlope" class="w-1/3 text-center outline-none bg-transparent border-l border-ios-border text-ios-orange" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-end mb-1 px-2">
+                                <h3 class="text-xs font-semibold text-ios-textDim uppercase">Matrice Décollage</h3>
+                                <div class="flex gap-3">
+                                    <button type="button" onclick="document.getElementById('importTkofFile').click()" class="text-ios-blue text-sm font-medium"><i class="fa-solid fa-file-import"></i> JSON</button>
+                                    <input type="file" id="importTkofFile" accept=".json" class="hidden" onchange="importMatrix(event, 'tkof')">
+                                    <button type="button" onclick="addPerfRow('tkof')" class="text-ios-blue text-sm font-medium"><i class="fa-solid fa-plus"></i> Ligne</button>
+                                </div>
+                            </div>
+                            <div class="ios-list rounded-lg overflow-hidden border-x border-ios-border">
+                                <div class="flex items-center p-2 bg-ios-bg text-[10px] font-bold text-ios-textDim border-b border-ios-border uppercase">
+                                    <div class="w-1/5 text-center">Masse(kg)</div><div class="w-1/5 text-center">Alt(ft)</div><div class="w-1/5 text-center">T(°C)</div><div class="w-1/5 text-center text-ios-blue">Roul.(m)</div><div class="w-1/5 text-center text-ios-blue">15m(m)</div><div class="w-8"></div>
+                                </div>
+                                <div id="editPerfTkofList" class="divide-y divide-gray-100"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-end mb-1 px-2">
+                                <h3 class="text-xs font-semibold text-ios-textDim uppercase">Matrice Atterrissage</h3>
+                                <div class="flex gap-3">
+                                    <button type="button" onclick="document.getElementById('importLdgFile').click()" class="text-ios-blue text-sm font-medium"><i class="fa-solid fa-file-import"></i> JSON</button>
+                                    <input type="file" id="importLdgFile" accept=".json" class="hidden" onchange="importMatrix(event, 'ldg')">
+                                    <button type="button" onclick="addPerfRow('ldg')" class="text-ios-blue text-sm font-medium"><i class="fa-solid fa-plus"></i> Ligne</button>
+                                </div>
+                            </div>
+                            <div class="ios-list rounded-lg overflow-hidden border-x border-ios-border">
+                                <div class="flex items-center p-2 bg-ios-bg text-[10px] font-bold text-ios-textDim border-b border-ios-border uppercase">
+                                    <div class="w-1/5 text-center">Masse(kg)</div><div class="w-1/5 text-center">Alt(ft)</div><div class="w-1/5 text-center">T(°C)</div><div class="w-1/5 text-center text-ios-green">Roul.(m)</div><div class="w-1/5 text-center text-ios-green">15m(m)</div><div class="w-8"></div>
+                                </div>
+                                <div id="editPerfLdgList" class="divide-y divide-gray-100"></div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- ================= ONGLET PISTES ================= -->
+                <div id="tabRw" class="hidden space-y-6">
+                    <div class="flex gap-2 mb-2">
+                        <select id="rwProfileSelect" class="flex-1 bg-white border border-ios-border text-ios-blue py-2 px-3 rounded-lg font-medium shadow-sm outline-none" onchange="loadRwProfile(this.value)"></select>
+                        <button onclick="createNewRwProfile()" class="bg-white border border-ios-border text-ios-blue px-4 py-2 rounded-lg font-medium shadow-sm active:bg-gray-50"><i class="fa-solid fa-plus"></i></button>
+                        <button onclick="deleteRwProfile()" id="btnDeleteRw" class="bg-white border border-ios-border text-ios-red px-4 py-2 rounded-lg font-medium shadow-sm active:bg-gray-50"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    <form id="rwForm" class="space-y-6">
+                        <div>
+                            <h3 class="text-xs font-semibold text-ios-textDim uppercase ml-2 mb-1">Aérodrome / Piste</h3>
+                            <div class="ios-list rounded-lg overflow-hidden border-x border-ios-border">
+                                <div class="flex items-center p-3 ios-list-item bg-white">
+                                    <label class="w-1/3 text-sm font-medium">Nom (ex: Lognes)</label>
+                                    <input type="text" id="editRwName" class="w-2/3 text-right outline-none bg-transparent font-medium" required>
+                                </div>
+                                <div class="flex items-center p-3 ios-list-item bg-white">
+                                    <label class="w-1/2 text-sm font-medium">Surface</label>
+                                    <select id="editRwSurface" class="w-1/2 text-right bg-transparent outline-none" dir="rtl">
+                                        <option value="dur">Dur</option>
+                                        <option value="herbe">Herbe</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-center p-3 bg-white">
+                                    <label class="w-1/2 text-sm font-medium">Pente Globale (%)</label>
+                                    <input type="number" step="0.5" id="editRwSlope" class="w-1/2 text-right outline-none bg-transparent" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <!-- QFU 1 -->
+                            <div class="bg-white border border-ios-border rounded-lg overflow-hidden">
+                                <h3 class="text-xs font-bold text-center bg-gray-100 p-2 border-b border-ios-border">QFU 1</h3>
+                                <div class="p-2 space-y-2">
+                                    <div class="flex justify-between items-center"><label class="text-xs">Nom</label><input type="text" id="editRwQfu1Name" class="w-16 text-right border bg-gray-50 rounded px-1" placeholder="ex: 08" required></div>
+                                    <div class="flex justify-between items-center"><label class="text-xs">TODA (m)</label><input type="number" id="editRwQfu1Toda" class="w-16 text-right border bg-gray-50 rounded px-1" required></div>
+                                    <div class="flex justify-between items-center"><label class="text-xs">ASDA (m)</label><input type="number" id="editRwQfu1Asda" class="w-16 text-right border bg-gray-50 rounded px-1" required></div>
+                                    <div class="flex justify-between items-center"><label class="text-xs">LDA (m)</label><input type="number" id="editRwQfu1Lda" class="w-16 text-right border bg-gray-50 rounded px-1" required></div>
+                                </div>
+                            </div>
+                            <!-- QFU 2 -->
+                            <div class="bg-white border border-ios-border rounded-lg overflow-hidden">
+                                <h3 class="text-xs font-bold text-center bg-gray-100 p-2 border-b border-ios-border">QFU 2</h3>
+                                <div class="p-2 space-y-2">
+                                    <div class="flex justify-between items-center"><label class="text-xs">Nom</label><input type="text" id="editRwQfu2Name" class="w-16 text-right border bg-gray-50 rounded px-1" placeholder="ex: 26" required></div>
+                                    <div class="flex justify-between items-center"><label class="text-xs">TODA (m)</label><input type="number" id="editRwQfu2Toda" class="w-16 text-right border bg-gray-50 rounded px-1" required></div>
+                                    <div class="flex justify-between items-center"><label class="text-xs">ASDA (m)</label><input type="number" id="editRwQfu2Asda" class="w-16 text-right border bg-gray-50 rounded px-1" required></div>
+                                    <div class="flex justify-between items-center"><label class="text-xs">LDA (m)</label><input type="number" id="editRwQfu2Lda" class="w-16 text-right border bg-gray-50 rounded px-1" required></div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- ================= ONGLET DONNEES (IMPORT/EXPORT) ================= -->
+                <div id="tabData" class="hidden space-y-6">
+                    <div>
+                        <h3 class="text-xs font-semibold text-ios-textDim uppercase ml-2 mb-1">Sauvegarde et Partage</h3>
+                        <div class="ios-list rounded-lg overflow-hidden border-x border-ios-border">
+                            <button onclick="exportData()" class="w-full flex items-center p-4 ios-list-item bg-white hover:bg-gray-50 text-left transition-colors">
+                                <div class="w-10 text-ios-blue text-xl text-center"><i class="fa-solid fa-file-export"></i></div>
+                                <div>
+                                    <div class="font-semibold text-ios-text text-sm">Exporter les données</div>
+                                    <div class="text-xs text-ios-textDim">Télécharger aéronefs, perfs et pistes (.json)</div>
+                                </div>
+                            </button>
+                            <button onclick="document.getElementById('importFile').click()" class="w-full flex items-center p-4 ios-list-item bg-white hover:bg-gray-50 text-left transition-colors">
+                                <div class="w-10 text-ios-green text-xl text-center"><i class="fa-solid fa-file-import"></i></div>
+                                <div>
+                                    <div class="font-semibold text-ios-text text-sm">Importer des données</div>
+                                    <div class="text-xs text-ios-textDim">Charger un fichier (remplace tout)</div>
+                                </div>
+                            </button>
+                            <input type="file" id="importFile" accept=".json" class="hidden" onchange="handleImport(event)">
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-xs font-semibold text-ios-textDim uppercase ml-2 mb-1">Réinitialisation</h3>
+                        <div class="ios-list rounded-lg overflow-hidden border-x border-ios-border">
+                            <button onclick="resetData()" class="w-full flex items-center p-4 bg-white hover:bg-red-50 text-left transition-colors">
+                                <div class="w-10 text-ios-red text-xl text-center"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                                <div>
+                                    <div class="font-semibold text-ios-red text-sm">Restaurer les valeurs par défaut</div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="h-10"></div> <!-- Padding bottom mobile -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DONNÉES PAR DÉFAUT ---
+        const defaultPerfModels = [{
+            id: "model-dr400-120", name: "DR400 120 (1984 lb)",
+            factors: { tkofHw10: 0.85, tkofHw20: 0.65, tkofHw30: 0.55, tkofTw: 10, tkofGrass: 15, tkofSlope: 10, ldgHw10: 0.78, ldgHw20: 0.63, ldgHw30: 0.52, ldgTw: 10, ldgGrass: 15, ldgSlope: 10 },
+            takeoff: [ { mass: 900, alt: 0, temp: -5, roll: 225, clear: 480 }, { mass: 900, alt: 0, temp: 15, roll: 235, clear: 535 }, { mass: 900, alt: 0, temp: 35, roll: 285, clear: 590 }, { mass: 900, alt: 4000, temp: -13, roll: 305, clear: 645 }, { mass: 900, alt: 4000, temp: 7, roll: 345, clear: 720 }, { mass: 900, alt: 4000, temp: 27, roll: 390, clear: 800 }, { mass: 900, alt: 8000, temp: -21, roll: 425, clear: 890 }, { mass: 900, alt: 8000, temp: -1, roll: 475, clear: 1000 }, { mass: 900, alt: 8000, temp: 19, roll: 535, clear: 1125 }, { mass: 700, alt: 0, temp: -5, roll: 130, clear: 285 }, { mass: 700, alt: 0, temp: 15, roll: 145, clear: 315 }, { mass: 700, alt: 0, temp: 35, roll: 165, clear: 345 } ],
+            landing: [ { mass: 900, alt: 0, temp: -5, roll: 185, clear: 435 }, { mass: 900, alt: 0, temp: 15, roll: 200, clear: 460 }, { mass: 900, alt: 0, temp: 35, roll: 210, clear: 485 }, { mass: 900, alt: 4000, temp: -13, roll: 205, clear: 475 }, { mass: 900, alt: 4000, temp: 7, roll: 225, clear: 505 }, { mass: 900, alt: 4000, temp: 27, roll: 240, clear: 535 }, { mass: 700, alt: 0, temp: -5, roll: 145, clear: 365 }, { mass: 700, alt: 0, temp: 15, roll: 155, clear: 385 }, { mass: 700, alt: 0, temp: 35, roll: 165, clear: 400 } ]
+        }];
+
+        const defaultAircrafts = [{
+            id: "default-1", reg: "F-EXEM", modelId: "model-dr400-120", emptyMass: 580, emptyArm: 0.334, maxMass: 900, fuelDensity: 0.72, fuelConso: 35,
+            stations: [ { id: "s1", name: "Pilote + Passager AV", arm: 0.410, isFuel: false }, { id: "s2", name: "Passagers AR", arm: 1.190, isFuel: false }, { id: "s3", name: "Bagages soute", arm: 1.900, isFuel: false }, { id: "s4", name: "Essence", arm: 1.120, isFuel: true } ],
+            envelope: [ { arm: 0.205, mass: 580 }, { arm: 0.205, mass: 750 }, { arm: 0.420, mass: 900 }, { arm: 0.564, mass: 900 }, { arm: 0.564, mass: 580 } ]
+        }];
+
+        const defaultRunways = [{
+            id: "rw-1", name: "LFPL (Lognes)", surface: "dur", slope: 0,
+            qfu1: { name: "08", toda: 700, asda: 700, lda: 700 }, qfu2: { name: "26", toda: 700, asda: 700, lda: 700 }
+        }];
+
+        // --- ÉTAT ---
+        let aircrafts = [], perfModels = [], runways = [];
+        let currentAircraftId = null;
+        let chartInstance = null, currentInputs = {}, hasComputedOnce = false;
+        let activeModalTab = 'ac', editingAcId = null, editingPerfId = null, editingRwId = null;
+
+        window.onload = () => {
+            loadData();
+            initChart();
+            populateAircraftSelect();
+            populateRunwayDropdowns();
+            if(aircrafts.length > 0) selectAircraft(aircrafts[0].id);
+
+            ['condAlt', 'condTemp', 'condWind', 'condSlope', 'condRunway', 'condQfu'].forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.addEventListener('input', invalidateResults);
+            });
+            document.getElementById('condSurface').addEventListener('change', invalidateResults);
+        };
+
+        function loadData() {
+            try {
+                const sAc = localStorage.getItem('aeroCalcProfiles');
+                const sPerf = localStorage.getItem('aeroCalcPerfModels');
+                const sRw = localStorage.getItem('aeroCalcRunways');
+                
+                perfModels = sPerf ? JSON.parse(sPerf) : JSON.parse(JSON.stringify(defaultPerfModels));
+                runways = sRw ? JSON.parse(sRw) : JSON.parse(JSON.stringify(defaultRunways));
+                if (sAc) {
+                    aircrafts = JSON.parse(sAc);
+                    aircrafts.forEach(ac => { if (ac.fuelDensity === undefined) ac.fuelDensity = 0.72; if (ac.fuelConso === undefined) ac.fuelConso = 35; });
+                } else aircrafts = JSON.parse(JSON.stringify(defaultAircrafts)); 
+            } catch(e) { 
+                aircrafts = [...defaultAircrafts]; perfModels = [...defaultPerfModels]; runways = [...defaultRunways];
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('aeroCalcProfiles', JSON.stringify(aircrafts));
+            localStorage.setItem('aeroCalcPerfModels', JSON.stringify(perfModels));
+            localStorage.setItem('aeroCalcRunways', JSON.stringify(runways));
+        }
+
+        // ====== MAIN UI ======
+        function populateAircraftSelect() {
+            const select = document.getElementById('aircraftSelect');
+            select.innerHTML = '';
+            aircrafts.forEach(ac => {
+                const opt = document.createElement('option'); opt.value = ac.id; opt.textContent = ac.reg; select.appendChild(opt);
+            });
+            if (currentAircraftId) select.value = currentAircraftId;
+            select.onchange = (e) => selectAircraft(e.target.value);
+        }
+
+        function populateRunwayDropdowns() {
+            const select = document.getElementById('condRunway');
+            select.innerHTML = '<option value="manual">Manuelle</option>';
+            runways.forEach(rw => {
+                const opt = document.createElement('option'); opt.value = rw.id; opt.textContent = rw.name; select.appendChild(opt);
+            });
+            onRunwaySelected();
+        }
+
+        function onRunwaySelected() {
+            const rwId = document.getElementById('condRunway').value;
+            const qfuSelect = document.getElementById('condQfu');
+            
+            if (rwId === 'manual') {
+                qfuSelect.style.display = 'none';
+                document.getElementById('condSurface').disabled = false;
+                document.getElementById('condSlope').disabled = false;
+            } else {
+                const rw = runways.find(r => r.id === rwId);
+                if (rw) {
+                    qfuSelect.innerHTML = `<option value="1">${rw.qfu1.name}</option><option value="2">${rw.qfu2.name}</option>`;
+                    qfuSelect.style.display = 'inline-block';
+                    document.getElementById('condSurface').value = rw.surface;
+                    document.getElementById('condSlope').value = rw.slope; // Par défaut QFU1
+                    
+                    document.getElementById('condSurface').disabled = true;
+                    document.getElementById('condSlope').disabled = true;
+                    onQfuSelected();
+                }
+            }
+            invalidateResults();
+        }
+
+        function onQfuSelected() {
+            const rwId = document.getElementById('condRunway').value;
+            const qfuIdx = document.getElementById('condQfu').value;
+            if (rwId !== 'manual') {
+                const rw = runways.find(r => r.id === rwId);
+                document.getElementById('condSlope').value = qfuIdx === '1' ? rw.slope : -rw.slope;
+            }
+            invalidateResults();
+        }
+
+        function selectAircraft(id) {
+            currentAircraftId = id;
+            currentInputs = {}; hasComputedOnce = false;
+            resetResultsUI();
+
+            const ac = getAircraft(); if(!ac) return;
+            const model = perfModels.find(m => m.id === ac.modelId);
+            document.getElementById('aircraftNameDisplay').textContent = `${ac.reg}${model ? ` | ${model.name}` : ''}`;
+            
+            const container = document.getElementById('stationsContainer'); container.innerHTML = '';
+            
+            ac.stations.forEach(st => {
+                currentInputs[st.id] = { value: 0, unit: st.isFuel ? 'l' : 'kg' };
+                const div = document.createElement('div');
+                div.className = "flex justify-between items-center p-3 ios-list-item bg-white transition-colors focus-within:bg-blue-50";
+                
+                let inputHtml = `
+                    <div class="flex flex-col">
+                        <label class="text-sm font-semibold text-ios-text">${st.name}</label>
+                        <span class="text-xs text-ios-textDim">Bras: ${st.arm.toFixed(3)}m</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="number" min="0" step="1" placeholder="0" class="w-20 text-right text-lg font-medium outline-none bg-transparent" data-station="${st.id}">
+                `;
+
+                if (st.isFuel) {
+                    inputHtml += `<select class="bg-gray-100 border border-gray-200 text-gray-700 text-sm rounded py-1 px-2 font-medium outline-none" data-unit="${st.id}">
+                                    <option value="l" selected>L</option><option value="kg">kg</option>
+                                  </select>`;
+                } else inputHtml += `<span class="text-ios-textDim font-medium w-6 text-right">kg</span>`;
+                
+                inputHtml += `</div>`; div.innerHTML = inputHtml; container.appendChild(div);
+
+                const inputNum = div.querySelector(`input[data-station="${st.id}"]`);
+                inputNum.addEventListener('input', (e) => {
+                    const val = parseFloat(e.target.value); currentInputs[st.id].value = isNaN(val) ? 0 : val; invalidateResults();
+                });
+                if (st.isFuel) {
+                    div.querySelector(`select[data-unit="${st.id}"]`).addEventListener('change', (e) => { currentInputs[st.id].unit = e.target.value; invalidateResults(); });
+                }
+            });
+        }
+
+        function getAircraft(id = currentAircraftId) { return aircrafts.find(a => a.id === id); }
+
+        function resetResultsUI() {
+            document.getElementById('resultsContainer').classList.add('opacity-50', 'pointer-events-none');
+            document.getElementById('summaryTableBody').innerHTML = '';
+            document.getElementById('zfwMass').textContent = '0.0'; document.getElementById('towMass').textContent = '0.0';
+            if(chartInstance) { chartInstance.data.datasets = []; chartInstance.update(); }
+            const banner = document.getElementById('statusBanner');
+            banner.className = "bg-white border border-ios-border rounded-xl p-4 flex items-center gap-4";
+            document.getElementById('statusIcon').innerHTML = '<i class="fa-solid fa-circle-minus text-ios-textDim"></i>';
+            document.getElementById('statusTitle').textContent = "En attente"; document.getElementById('statusTitle').className = "font-bold text-ios-text";
+            document.getElementById('statusMessage').textContent = "Cliquez sur calculer pour vérifier le centrage."; document.getElementById('statusMessage').className = "text-sm text-ios-textDim";
+            document.getElementById('runwayVisualizer').classList.add('hidden');
+        }
+
+        function invalidateResults() {
+            if (hasComputedOnce) {
+                document.getElementById('resultsContainer').classList.add('opacity-50');
+                const btn = document.getElementById('computeBtn');
+                btn.innerHTML = '<i class="fa-solid fa-calculator"></i> Mettre à jour le calcul'; btn.classList.add('animate-pulse');
+            }
+        }
+
+        function simulateCompute() {
+            const btn = document.getElementById('computeBtn');
+            const overlay = document.getElementById('loadingOverlay');
+            btn.disabled = true; btn.classList.remove('animate-pulse'); btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Calcul...';
+            overlay.classList.remove('hidden');
+
+            setTimeout(() => {
+                calculate();
+                overlay.classList.add('hidden'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Calculé';
+                document.getElementById('resultsContainer').classList.remove('opacity-50', 'pointer-events-none'); hasComputedOnce = true;
+                setTimeout(() => { btn.innerHTML = '<i class="fa-solid fa-calculator"></i> Calculer le centrage'; }, 2000);
+            }, 600);
+        }
+
+        function calculate() {
+            const ac = getAircraft(); if(!ac) return;
+
+            let zfwMass = ac.emptyMass, zfwMoment = ac.emptyMass * ac.emptyArm, fuelMass = 0, fuelMoment = 0;
+            const tbody = document.getElementById('summaryTableBody');
+            tbody.innerHTML = `<tr class="bg-white"><td class="px-4 py-2 font-medium text-ios-text">Masse à vide</td><td class="px-4 py-2 text-right font-mono">${ac.emptyMass.toFixed(1)}</td><td class="px-4 py-2 text-right font-mono text-ios-textDim hidden sm:table-cell">${ac.emptyArm.toFixed(3)}</td><td class="px-4 py-2 text-right font-mono text-ios-textDim hidden sm:table-cell">${(ac.emptyMass * ac.emptyArm).toFixed(2)}</td></tr>`;
+
+            ac.stations.forEach(st => {
+                const inputData = currentInputs[st.id];
+                if (inputData && inputData.value > 0) {
+                    let finalMass = inputData.value;
+                    if (st.isFuel && inputData.unit === 'l') finalMass = inputData.value * ac.fuelDensity;
+                    const moment = finalMass * st.arm;
+                    if (st.isFuel) { fuelMass += finalMass; fuelMoment += moment; } else { zfwMass += finalMass; zfwMoment += moment; }
+                    
+                    let massDisplay = finalMass.toFixed(1);
+                    if (st.isFuel && inputData.unit === 'l') massDisplay = `<span class="text-xs text-ios-textDim mr-1">${inputData.value}L</span>${finalMass.toFixed(1)}`;
+
+                    tbody.innerHTML += `<tr class="bg-white"><td class="px-4 py-2 text-sm">${st.name}</td><td class="px-4 py-2 text-right font-mono">${massDisplay}</td><td class="px-4 py-2 text-right font-mono text-ios-textDim hidden sm:table-cell">${st.arm.toFixed(3)}</td><td class="px-4 py-2 text-right font-mono text-ios-textDim hidden sm:table-cell">${moment.toFixed(2)}</td></tr>`;
+                }
+            });
+
+            const towMass = zfwMass + fuelMass, towMoment = zfwMoment + fuelMoment;
+            const zfwArm = zfwMass > 0 ? zfwMoment / zfwMass : 0, towArm = towMass > 0 ? towMoment / towMass : 0;
+
+            document.getElementById('zfwMass').textContent = zfwMass.toFixed(1); document.getElementById('zfwArm').textContent = zfwArm.toFixed(3); document.getElementById('zfwMoment').textContent = zfwMoment.toFixed(2);
+            document.getElementById('towMass').textContent = towMass.toFixed(1); document.getElementById('towArm').textContent = towArm.toFixed(3); document.getElementById('towMoment').textContent = towMoment.toFixed(2);
+
+            checkSafety(ac, zfwArm, zfwMass, towArm, towMass);
+            updateChart(ac, zfwArm, zfwMass, towArm, towMass);
+            calculatePerformance(ac, towMass, zfwMass);
+        }
+
+        function calculatePerformance(ac, towMass, zfwMass) {
+            const perfContainer = document.getElementById('perfResultsContainer');
+            if (!ac.modelId) { perfContainer.classList.add('hidden'); return; }
+            const model = perfModels.find(m => m.id === ac.modelId);
+            if (!model || model.takeoff.length === 0 || model.landing.length === 0) { perfContainer.classList.add('hidden'); return; }
+
+            perfContainer.classList.remove('hidden');
+
+            const alt = parseFloat(document.getElementById('condAlt').value) || 0;
+            const temp = parseFloat(document.getElementById('condTemp').value) || 15;
+            const wind = parseFloat(document.getElementById('condWind').value) || 0;
+            const isGrass = document.getElementById('condSurface').value === 'herbe';
+            const slope = parseFloat(document.getElementById('condSlope').value) || 0;
+            const isFlapsFail = document.getElementById('chkFlapsFail').checked;
+            
+            const flightTime = parseFloat(document.getElementById('condFlightTime').value) || 0;
+            const fuelConso = ac.fuelConso || 0;
+            const tripFuelMass = flightTime * fuelConso * ac.fuelDensity;
+            const ldgMass = Math.max(zfwMass, towMass - tripFuelMass);
+
+            document.getElementById('infoTowMass').textContent = `${towMass.toFixed(0)} kg`;
+            document.getElementById('infoLdgMass').textContent = `${ldgMass.toFixed(0)} kg`;
+
+            const baseTkof = interpolatePerf(model.takeoff, towMass, alt, temp);
+            const baseLdg = interpolatePerf(model.landing, ldgMass, alt, temp);
+
+            const finalTkofRoll = applyPerfFactors(baseTkof.roll, 'tkof', wind, isGrass, slope, model.factors, false);
+            const finalTkofClear = applyPerfFactors(baseTkof.clear, 'tkof', wind, isGrass, slope, model.factors, false);
+            const finalLdgRoll = applyPerfFactors(baseLdg.roll, 'ldg', wind, isGrass, slope, model.factors, isFlapsFail);
+            const finalLdgClear = applyPerfFactors(baseLdg.clear, 'ldg', wind, isGrass, slope, model.factors, isFlapsFail);
+
+            document.getElementById('resTkofRoll').textContent = Math.round(finalTkofRoll) + ' m';
+            document.getElementById('resTkofClear').textContent = Math.round(finalTkofClear) + ' m';
+            document.getElementById('resLdgRoll').textContent = Math.round(finalLdgRoll) + ' m';
+            document.getElementById('resLdgClear').textContent = Math.round(finalLdgClear) + ' m';
+
+            updateRunwayVisuals(finalTkofRoll, finalTkofClear, finalLdgRoll, finalLdgClear);
+        }
+
+        function updateRunwayVisuals(tkofRoll, tkofClear, ldgRoll, ldgClear) {
+            const visuDiv = document.getElementById('runwayVisualizer');
+            const rwId = document.getElementById('condRunway').value;
+            
+            if (rwId === 'manual') {
+                visuDiv.classList.add('hidden');
+                return;
+            }
+
+            const rw = runways.find(r => r.id === rwId);
+            const qfuIdx = document.getElementById('condQfu').value;
+            const qfu = qfuIdx === '1' ? rw.qfu1 : rw.qfu2;
+
+            visuDiv.classList.remove('hidden');
+            document.getElementById('visuRwName').textContent = `${rw.name}`;
+            document.getElementById('visuRwNumTkof').textContent = qfu.name;
+            document.getElementById('visuRwNumLdg').textContent = qfu.name;
+            document.getElementById('valToda').textContent = qfu.toda;
+            document.getElementById('valLda').textContent = qfu.lda;
+
+            // Fonction utilitaire pour dessiner les flèches
+            const drawDimension = (val, max, barId, dimId, txtId, isWarning, colorClass, baseColorClass) => {
+                const pct = Math.min(100, Math.max(0, (val / max) * 100));
+                const bar = document.getElementById(barId);
+                const dim = document.getElementById(dimId);
+                const txt = document.getElementById(txtId);
+
+                bar.style.width = pct + '%';
+                dim.style.width = pct + '%';
+
+                if (val > max) {
+                    // Hors limite = ROUGE
+                    bar.className = `absolute top-1/2 left-4 h-6 -mt-3 bg-red-500/70 border-r-2 border-red-600 transition-all z-10 flex items-center overflow-hidden`;
+                    dim.className = `absolute bottom-4 left-4 border-x border-b border-red-600 h-2 transition-all z-20`;
+                    txt.className = `absolute bottom-0 text-[10px] font-bold text-red-600 transition-all whitespace-nowrap text-center transform -translate-x-1/2`;
+                    txt.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i> ${Math.round(val)}m (Max ${max}m)`;
+                } else if (val > max * 0.85) {
+                    // Marge faible = ORANGE
+                    bar.className = `absolute top-1/2 left-4 h-6 -mt-3 bg-orange-400/70 border-r-2 border-orange-500 transition-all z-10 flex items-center overflow-hidden`;
+                    dim.className = `absolute bottom-4 left-4 border-x border-b border-orange-500 h-2 transition-all z-20`;
+                    txt.className = `absolute bottom-0 text-[10px] font-bold text-orange-600 transition-all whitespace-nowrap text-center transform -translate-x-1/2`;
+                    txt.textContent = `15m : ${Math.round(val)}m`;
+                } else {
+                    // OK = NORMAL COLOR
+                    bar.className = `absolute top-1/2 left-4 h-6 -mt-3 bg-${baseColorClass}/70 border-r-2 border-${baseColorClass} transition-all z-10 flex items-center overflow-hidden`;
+                    dim.className = `absolute bottom-4 left-4 border-x border-b border-${baseColorClass} h-2 transition-all z-20`;
+                    txt.className = `absolute bottom-0 text-[10px] font-bold text-${baseColorClass} transition-all whitespace-nowrap text-center transform -translate-x-1/2`;
+                    txt.textContent = `15m : ${Math.round(val)}m`;
+                }
+
+                // Centrer le texte sur la flèche (4 = left-4)
+                txt.style.left = `calc(1rem + ${pct / 2}%)`;
+            };
+
+            // Application
+            drawDimension(tkofClear, qfu.toda, 'barTkofRoll', 'dimTkofClear', 'txtTkofClear', false, 'ios-blue', 'ios-blue');
+            // Hack pour ajuster la barre de roulage vs le total 15m
+            document.getElementById('barTkofRoll').style.width = Math.min(100, (tkofRoll / qfu.toda) * 100) + '%';
+
+            drawDimension(ldgClear, qfu.lda, 'barLdgRoll', 'dimLdgClear', 'txtLdgClear', false, 'ios-green', 'ios-green');
+            document.getElementById('barLdgRoll').style.width = Math.min(100, (ldgRoll / qfu.lda) * 100) + '%';
+        }
+
+        function interpolatePerf(matrix, targetMass, targetAlt, targetTemp) {
+            if (matrix.length === 0) return { roll: 0, clear: 0 };
+            const maxM = Math.max(...matrix.map(d=>d.mass)), minM = Math.min(...matrix.map(d=>d.mass));
+            const maxA = Math.max(...matrix.map(d=>d.alt)), minA = Math.min(...matrix.map(d=>d.alt));
+            const maxT = Math.max(...matrix.map(d=>d.temp)), minT = Math.min(...matrix.map(d=>d.temp));
+            
+            const tM = Math.max(minM, Math.min(maxM, targetMass)), tA = Math.max(minA, Math.min(maxA, targetAlt)), tT = Math.max(minT, Math.min(maxT, targetTemp));
+            const rangeM = maxM - minM || 1, rangeA = maxA - minA || 1, rangeT = maxT - minT || 1;
+
+            let numRoll = 0, denRoll = 0, numClear = 0, denClear = 0;
+            for (let pt of matrix) {
+                let dM = (pt.mass - tM) / rangeM, dA = (pt.alt - tA) / rangeA, dT = (pt.temp - tT) / rangeT;
+                let distSq = dM*dM + dA*dA + dT*dT;
+                if (distSq === 0) return { roll: pt.roll, clear: pt.clear };
+                let weight = 1 / Math.pow(distSq, 2); 
+                numRoll += pt.roll * weight; denRoll += weight;
+                numClear += pt.clear * weight; denClear += weight;
+            }
+            return { roll: numRoll / denRoll, clear: numClear / denClear };
+        }
+
+        function applyPerfFactors(baseDist, type, wind, isGrass, slope, factors, isFlapsFail) {
+            let mult = 1.0;
+            if (wind > 0) {
+                let hwGrid = type === 'tkof' ? [[0,1], [10, factors.tkofHw10], [20, factors.tkofHw20], [30, factors.tkofHw30]] : [[0,1], [10, factors.ldgHw10], [20, factors.ldgHw20], [30, factors.ldgHw30]];
+                let wFactor = 1;
+                if (wind >= 30) wFactor = hwGrid[3][1];
+                else { for(let i=0; i<3; i++) { if (wind >= hwGrid[i][0] && wind <= hwGrid[i+1][0]) { let ratio = (wind - hwGrid[i][0]) / 10; wFactor = hwGrid[i][1] + ratio * (hwGrid[i+1][1] - hwGrid[i][1]); break; } } }
+                mult *= wFactor;
+            } else if (wind < 0) { let tw = Math.abs(wind); let twFact = type === 'tkof' ? factors.tkofTw : factors.ldgTw; mult *= (1 + (tw / 2) * (twFact / 100)); }
+            if (isGrass) { let grassFact = type === 'tkof' ? factors.tkofGrass : factors.ldgGrass; mult *= (1 + grassFact / 100); }
+            if (type === 'tkof' && slope > 0) mult *= (1 + (slope / 2) * (factors.tkofSlope / 100));
+            else if (type === 'ldg' && slope < 0) mult *= (1 + (Math.abs(slope) / 2) * (factors.ldgSlope / 100));
+            if (type === 'ldg' && isFlapsFail) mult *= 1.30;
+            return baseDist * mult;
+        }
+
+        function isPointInPolygon(point, vs) {
+            let x = point[0], y = point[1], inside = false;
+            for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+                let xi = vs[i][0], yi = vs[i][1], xj = vs[j][0], yj = vs[j][1];
+                let intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
+        function checkSafety(ac, zfwArm, zfwMass, towArm, towMass) {
+            const banner = document.getElementById('statusBanner'), icon = document.getElementById('statusIcon'), title = document.getElementById('statusTitle'), msg = document.getElementById('statusMessage');
+            const polygon = ac.envelope.map(pt => [pt.arm, pt.mass]);
+            let isTowValid = isPointInPolygon([towArm, towMass], polygon), isZfwValid = isPointInPolygon([zfwArm, zfwMass], polygon), isOverweight = towMass > ac.maxMass;
+            banner.className = "rounded-xl p-4 flex items-center gap-4 border";
+            if (isOverweight) {
+                banner.classList.add('bg-red-50', 'border-ios-red'); icon.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-ios-red"></i>'; title.className = "font-bold text-ios-red"; msg.className = "text-sm text-red-900"; title.textContent = "Surcharge Décollage"; msg.textContent = `La masse (${towMass.toFixed(1)} kg) excède le maximum autorisé (${ac.maxMass} kg).`;
+            } else if (!isTowValid) {
+                banner.classList.add('bg-red-50', 'border-ios-red'); icon.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-ios-red"></i>'; title.className = "font-bold text-ios-red"; msg.className = "text-sm text-red-900"; title.textContent = "Centrage TOW Hors Limites"; msg.textContent = "Le centre de gravité au décollage est en dehors de l'enveloppe.";
+            } else if (!isZfwValid) {
+                banner.classList.add('bg-orange-50', 'border-ios-orange'); icon.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-ios-orange"></i>'; title.className = "font-bold text-orange-800"; msg.className = "text-sm text-orange-900"; title.textContent = "Attention : ZFW Hors Limites"; msg.textContent = "Le centrage sortira des limites avec la consommation de carburant.";
+            } else {
+                banner.classList.add('bg-green-50', 'border-ios-green'); icon.innerHTML = '<i class="fa-solid fa-circle-check text-ios-green"></i>'; title.className = "font-bold text-green-800"; msg.className = "text-sm text-green-900"; title.textContent = "Vol Valide"; msg.textContent = "La masse et le centrage sont dans l'enveloppe de vol.";
+            }
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('cgChart').getContext('2d');
+            Chart.defaults.font.family = "system-ui, -apple-system, sans-serif";
+            chartInstance = new Chart(ctx, { type: 'scatter', data: { datasets: [] }, options: { responsive: true, maintainAspectRatio: false, animation: { duration: 0 }, scales: { x: { title: { display: true, text: 'Bras de levier (m)' }, grid: { color: '#e5e5ea' } }, y: { title: { display: true, text: 'Masse (kg)' }, grid: { color: '#e5e5ea' } } }, plugins: { legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } }, tooltip: { backgroundColor: '#000', padding: 10, callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.x.toFixed(3)}m, ${ctx.parsed.y.toFixed(0)}kg` } } } } });
+        }
+
+        function updateChart(ac, zfwArm, zfwMass, towArm, towMass) {
+            if(!chartInstance) return;
+            let envPoints = ac.envelope.map(p => ({ x: p.arm, y: p.mass }));
+            if (envPoints.length > 0) { const first = envPoints[0], last = envPoints[envPoints.length-1]; if(first.x !== last.x || first.y !== last.y) envPoints.push({...first}); }
+            const isFuelPresent = towMass > zfwMass;
+            const datasets = [ { label: 'Enveloppe', data: envPoints, borderColor: '#000000', backgroundColor: 'rgba(0,0,0,0.03)', borderWidth: 2, showLine: true, pointRadius: 0, fill: true, order: 3 }, { label: 'TOW', data: [{ x: towArm, y: towMass }], backgroundColor: '#007aff', borderColor: '#fff', borderWidth: 2, pointStyle: 'circle', pointRadius: 7, pointHoverRadius: 9, order: 1 } ];
+            if (isFuelPresent) { datasets.push({ label: 'ZFW', data: [{ x: zfwArm, y: zfwMass }], backgroundColor: '#fff', borderColor: '#8e8e93', borderWidth: 2, pointStyle: 'circle', pointRadius: 6, pointHoverRadius: 8, order: 2 }); datasets.push({ label: 'Conso', data: [{ x: towArm, y: towMass }, { x: zfwArm, y: zfwMass }], borderColor: '#8e8e93', borderWidth: 2, borderDash: [4, 4], showLine: true, pointRadius: 0, order: 4 }); }
+            const allX = envPoints.map(p => p.x); const allY = envPoints.map(p => p.y); allX.push(towArm); allY.push(towMass); if(isFuelPresent) { allX.push(zfwArm); allY.push(zfwMass); }
+            const minX = Math.min(...allX), maxX = Math.max(...allX), minY = Math.min(...allY), maxY = Math.max(...allY);
+            const xPadding = (maxX - minX) * 0.1 || 0.1, yPadding = (maxY - minY) * 0.1 || 50;
+            chartInstance.options.scales.x.min = minX - xPadding; chartInstance.options.scales.x.max = maxX + xPadding; chartInstance.options.scales.y.min = Math.max(0, minY - yPadding); chartInstance.options.scales.y.max = Math.max(ac.maxMass + yPadding, maxY + yPadding);
+            chartInstance.data.datasets = datasets; chartInstance.update();
+        }
+
+        // ================= GESTION DU MODAL (TABS & LOGIC) =================
+
+        function openProfileModal() { document.getElementById('profileModal').classList.remove('hidden'); switchModalTab('ac'); }
+        function closeProfileModal() { document.getElementById('profileModal').classList.add('hidden'); }
+
+        function switchModalTab(tab) {
+            activeModalTab = tab;
+            ['ac', 'perf', 'rw', 'data'].forEach(t => {
+                document.getElementById('tabBtn'+t.charAt(0).toUpperCase()+t.slice(1)).className = "px-3 py-1.5 text-sm font-semibold rounded-md text-ios-textDim hover:text-ios-text transition-all whitespace-nowrap";
+                document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.add('hidden');
+            });
+            const btn = document.getElementById('tabBtn'+tab.charAt(0).toUpperCase()+tab.slice(1));
+            const div = document.getElementById('tab'+tab.charAt(0).toUpperCase()+tab.slice(1));
+            btn.classList.add('bg-white', 'shadow', 'text-ios-text'); btn.classList.remove('text-ios-textDim', 'hover:text-ios-text');
+            div.classList.remove('hidden');
+
+            if (tab === 'ac') { populatePerfModelDropdown(); if (currentAircraftId) loadProfileIntoForm(currentAircraftId); else createNewProfile(); }
+            else if (tab === 'perf') { populatePerfSelect(); if (perfModels.length > 0) loadPerfProfile(perfModels[0].id); else createNewPerfProfile(); }
+            else if (tab === 'rw') { populateRwSelect(); if (runways.length > 0) loadRwProfile(runways[0].id); else createNewRwProfile(); }
+        }
+
+        function saveCurrentModalTab() {
+            if (activeModalTab === 'ac') saveProfile();
+            else if (activeModalTab === 'perf') savePerfProfile();
+            else if (activeModalTab === 'rw') saveRwProfile();
+            else closeProfileModal();
+        }
+
+        // ====== LOGIQUE ONGLET : AERONEF ======
+        function populatePerfModelDropdown() {
+            const select = document.getElementById('editModelId'); select.innerHTML = '<option value="">-- Aucun modèle perfo --</option>';
+            perfModels.forEach(m => { const opt = document.createElement('option'); opt.value = m.id; opt.textContent = m.name; select.appendChild(opt); });
+        }
+
+        function createNewProfile() {
+            editingAcId = 'ac_' + Date.now();
+            ['editReg', 'editModelId', 'editEmptyMass', 'editEmptyArm', 'editMaxMass'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('editFuelDensity').value = '0.72'; document.getElementById('editFuelConso').value = '35';
+            document.getElementById('editStationsList').innerHTML = ''; document.getElementById('editEnvelopeList').innerHTML = '';
+            addStationRow('Pilote + Passager', 0.41, false); addStationRow('Essence', 1.12, true);
+            addEnvelopeRow(0.205, 580); addEnvelopeRow(0.564, 580); addEnvelopeRow(0.564, 900); addEnvelopeRow(0.420, 900); addEnvelopeRow(0.205, 750);
+            populateAcSelectInModal(); document.getElementById('acProfileSelect').value = ''; document.getElementById('btnDeleteProfile').classList.add('hidden');
+        }
+
+        function populateAcSelectInModal() {
+            const sel = document.getElementById('acProfileSelect'); sel.innerHTML = '<option value="" disabled hidden>-- Nouvel Aéronef --</option>';
+            aircrafts.forEach(ac => { const opt = document.createElement('option'); opt.value = ac.id; opt.textContent = ac.reg; sel.appendChild(opt); });
+        }
+
+        function loadProfileIntoForm(id) {
+            const ac = aircrafts.find(a => a.id === id); if(!ac) return;
+            editingAcId = ac.id; populateAcSelectInModal(); document.getElementById('acProfileSelect').value = ac.id;
+            document.getElementById('editReg').value = ac.reg; document.getElementById('editModelId').value = ac.modelId || '';
+            document.getElementById('editEmptyMass').value = ac.emptyMass; document.getElementById('editEmptyArm').value = ac.emptyArm;
+            document.getElementById('editMaxMass').value = ac.maxMass; document.getElementById('editFuelDensity').value = ac.fuelDensity || 0.72;
+            document.getElementById('editFuelConso').value = ac.fuelConso || 35;
+            document.getElementById('editStationsList').innerHTML = ''; ac.stations.forEach(st => addStationRow(st.name, st.arm, st.isFuel));
+            document.getElementById('editEnvelopeList').innerHTML = ''; ac.envelope.forEach(pt => addEnvelopeRow(pt.arm, pt.mass));
+            if(aircrafts.length <= 1) document.getElementById('btnDeleteProfile').classList.add('hidden'); else document.getElementById('btnDeleteProfile').classList.remove('hidden');
+        }
+
+        function addStationRow(name = '', arm = '', isFuel = false) {
+            const list = document.getElementById('editStationsList'); const row = document.createElement('div');
+            row.className = "flex items-center p-2 ios-list-item bg-white station-row gap-2";
+            row.innerHTML = `
+                <button type="button" onclick="this.closest('.ios-list-item').remove()" class="text-ios-red text-xl px-2 hover:opacity-70"><i class="fa-solid fa-circle-minus"></i></button>
+                <input type="text" placeholder="Nom" value="${name}" class="w-1/3 outline-none st-name text-sm font-medium" required>
+                <input type="number" step="0.001" placeholder="Bras(m)" value="${arm}" class="w-1/4 outline-none st-arm text-sm text-right bg-gray-50 rounded px-1" required>
+                <label class="flex items-center text-xs text-ios-textDim flex-1 justify-end cursor-pointer"><input type="checkbox" class="mr-1 st-fuel" ${isFuel ? 'checked' : ''}> Réservoir</label>
+            `;
+            list.appendChild(row);
+        }
+
+        function addEnvelopeRow(arm = '', mass = '') {
+            const list = document.getElementById('editEnvelopeList'); const row = document.createElement('div');
+            row.className = "flex items-center p-2 ios-list-item bg-white env-row gap-2";
+            row.innerHTML = `
+                <button type="button" onclick="this.closest('.ios-list-item').remove()" class="text-ios-red text-xl px-2 hover:opacity-70"><i class="fa-solid fa-circle-minus"></i></button>
+                <div class="flex-1 flex gap-2">
+                    <div class="flex-1 flex items-center bg-gray-50 rounded px-2"><span class="text-xs text-ios-textDim">Bras(m)</span><input type="number" step="0.001" value="${arm}" class="w-full outline-none env-arm text-sm text-right bg-transparent py-1" required></div>
+                    <div class="flex-1 flex items-center bg-gray-50 rounded px-2"><span class="text-xs text-ios-textDim">Masse(kg)</span><input type="number" step="1" value="${mass}" class="w-full outline-none env-mass text-sm text-right bg-transparent py-1" required></div>
+                </div>
+            `;
+            list.appendChild(row);
+        }
+
+        function saveProfile() {
+            const form = document.getElementById('aircraftForm'); if(!form.checkValidity()) { form.reportValidity(); return; }
+            const newAc = {
+                id: editingAcId, reg: document.getElementById('editReg').value, modelId: document.getElementById('editModelId').value,
+                emptyMass: parseFloat(document.getElementById('editEmptyMass').value), emptyArm: parseFloat(document.getElementById('editEmptyArm').value),
+                maxMass: parseFloat(document.getElementById('editMaxMass').value), fuelDensity: parseFloat(document.getElementById('editFuelDensity').value),
+                fuelConso: parseFloat(document.getElementById('editFuelConso').value), stations: [], envelope: []
+            };
+            document.querySelectorAll('.station-row').forEach((row, idx) => { newAc.stations.push({ id: 'st_' + idx, name: row.querySelector('.st-name').value, arm: parseFloat(row.querySelector('.st-arm').value), isFuel: row.querySelector('.st-fuel').checked }); });
+            document.querySelectorAll('.env-row').forEach(row => { newAc.envelope.push({ arm: parseFloat(row.querySelector('.env-arm').value), mass: parseFloat(row.querySelector('.env-mass').value) }); });
+            if(newAc.envelope.length < 3) { alert("L'enveloppe doit contenir au moins 3 points."); return; }
+            const existingIndex = aircrafts.findIndex(a => a.id === newAc.id);
+            if(existingIndex >= 0) aircrafts[existingIndex] = newAc; else aircrafts.push(newAc);
+            saveData(); populateAircraftSelect(); selectAircraft(newAc.id); alert("Aéronef enregistré avec succès.");
+        }
+
+        function deleteCurrentProfile() {
+            if(aircrafts.length <= 1) { alert("Vous ne pouvez pas supprimer le dernier aéronef."); return; }
+            if(confirm("Supprimer définitivement cet aéronef ?")) { aircrafts = aircrafts.filter(a => a.id !== editingAcId); saveData(); populateAircraftSelect(); selectAircraft(aircrafts[0].id); loadProfileIntoForm(aircrafts[0].id); }
+        }
+
+        // ====== LOGIQUE ONGLET : PERFORMANCES ======
+        function populatePerfSelect() {
+            const sel = document.getElementById('perfModelSelect'); sel.innerHTML = '<option value="" disabled hidden>-- Nouveau Modèle --</option>';
+            perfModels.forEach(m => { const opt = document.createElement('option'); opt.value = m.id; opt.textContent = m.name; sel.appendChild(opt); });
+        }
+
+        function createNewPerfProfile() {
+            editingPerfId = 'perf_' + Date.now(); populatePerfSelect(); document.getElementById('perfModelSelect').value = ''; document.getElementById('editPerfName').value = '';
+            document.getElementById('tkofHw10').value = 1; document.getElementById('ldgHw10').value = 1; document.getElementById('tkofHw20').value = 1; document.getElementById('ldgHw20').value = 1;
+            document.getElementById('tkofHw30').value = 1; document.getElementById('ldgHw30').value = 1; document.getElementById('tkofTw').value = 10; document.getElementById('ldgTw').value = 10;
+            document.getElementById('tkofGrass').value = 15; document.getElementById('ldgGrass').value = 15; document.getElementById('tkofSlope').value = 10; document.getElementById('ldgSlope').value = 10;
+            document.getElementById('editPerfTkofList').innerHTML = ''; document.getElementById('editPerfLdgList').innerHTML = '';
+            addPerfRow('tkof', 900, 0, 15, 0, 0); addPerfRow('ldg', 900, 0, 15, 0, 0); document.getElementById('btnDeletePerf').classList.add('hidden');
+        }
+
+        function loadPerfProfile(id) {
+            const m = perfModels.find(x => x.id === id); if(!m) return;
+            editingPerfId = m.id; populatePerfSelect(); document.getElementById('perfModelSelect').value = m.id; document.getElementById('editPerfName').value = m.name;
+            document.getElementById('tkofHw10').value = m.factors.tkofHw10 || 1; document.getElementById('ldgHw10').value = m.factors.ldgHw10 || 1;
+            document.getElementById('tkofHw20').value = m.factors.tkofHw20 || 1; document.getElementById('ldgHw20').value = m.factors.ldgHw20 || 1;
+            document.getElementById('tkofHw30').value = m.factors.tkofHw30 || 1; document.getElementById('ldgHw30').value = m.factors.ldgHw30 || 1;
+            document.getElementById('tkofTw').value = m.factors.tkofTw || 0; document.getElementById('ldgTw').value = m.factors.ldgTw || 0;
+            document.getElementById('tkofGrass').value = m.factors.tkofGrass || 0; document.getElementById('ldgGrass').value = m.factors.ldgGrass || 0;
+            document.getElementById('tkofSlope').value = m.factors.tkofSlope || 0; document.getElementById('ldgSlope').value = m.factors.ldgSlope || 0;
+            document.getElementById('editPerfTkofList').innerHTML = ''; m.takeoff.forEach(r => addPerfRow('tkof', r.mass, r.alt, r.temp, r.roll, r.clear));
+            document.getElementById('editPerfLdgList').innerHTML = ''; m.landing.forEach(r => addPerfRow('ldg', r.mass, r.alt, r.temp, r.roll, r.clear));
+            document.getElementById('btnDeletePerf').classList.remove('hidden');
+        }
+
+        function addPerfRow(type, mass = '', alt = '', temp = '', roll = '', clear = '') {
+            const list = document.getElementById(type === 'tkof' ? 'editPerfTkofList' : 'editPerfLdgList'); const row = document.createElement('div');
+            row.className = `flex items-center p-1.5 ios-list-item bg-white gap-1 perf-${type}-row`;
+            row.innerHTML = `
+                <input type="number" step="1" placeholder="Masse" value="${mass}" class="w-1/5 outline-none text-xs sm:text-sm font-mono text-center bg-gray-50 rounded py-1.5 row-mass border border-gray-200" required>
+                <input type="number" step="1" placeholder="Alt" value="${alt}" class="w-1/5 outline-none text-xs sm:text-sm font-mono text-center bg-gray-50 rounded py-1.5 row-alt border border-gray-200" required>
+                <input type="number" step="1" placeholder="°C" value="${temp}" class="w-1/5 outline-none text-xs sm:text-sm font-mono text-center bg-gray-50 rounded py-1.5 row-temp border border-gray-200" required>
+                <input type="number" step="1" placeholder="Roul." value="${roll}" class="w-1/5 outline-none text-xs sm:text-sm font-mono text-center bg-blue-50 text-ios-blue font-bold rounded py-1.5 row-roll border border-blue-100" required>
+                <input type="number" step="1" placeholder="15m" value="${clear}" class="w-1/5 outline-none text-xs sm:text-sm font-mono text-center bg-blue-50 text-ios-blue font-bold rounded py-1.5 row-clear border border-blue-100" required>
+                <button type="button" onclick="this.closest('.ios-list-item').remove()" class="w-8 text-ios-red text-center hover:opacity-70 text-lg"><i class="fa-solid fa-circle-minus"></i></button>
+            `;
+            list.appendChild(row);
+        }
+
+        function importMatrix(event, type) {
+            const file = event.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (Array.isArray(data)) {
+                        const listId = type === 'tkof' ? 'editPerfTkofList' : 'editPerfLdgList';
+                        document.getElementById(listId).innerHTML = '';
+                        data.forEach(r => {
+                            addPerfRow(type, r.mass || '', r.alt || '', r.temp || '', r.roll || '', r.clear || '');
+                        });
+                        alert('Matrice importée avec succès !');
+                    } else {
+                        alert("Le fichier JSON doit contenir un tableau d'objets.");
+                    }
+                } catch (err) {
+                    alert("Erreur de lecture du JSON. Vérifiez le format.");
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function savePerfProfile() {
+            const form = document.getElementById('perfForm'); if(!form.checkValidity()) { form.reportValidity(); return; }
+            const newPerf = {
+                id: editingPerfId, name: document.getElementById('editPerfName').value,
+                factors: { tkofHw10: parseFloat(document.getElementById('tkofHw10').value), ldgHw10: parseFloat(document.getElementById('ldgHw10').value), tkofHw20: parseFloat(document.getElementById('tkofHw20').value), ldgHw20: parseFloat(document.getElementById('ldgHw20').value), tkofHw30: parseFloat(document.getElementById('tkofHw30').value), ldgHw30: parseFloat(document.getElementById('ldgHw30').value), tkofTw: parseFloat(document.getElementById('tkofTw').value), ldgTw: parseFloat(document.getElementById('ldgTw').value), tkofGrass: parseFloat(document.getElementById('tkofGrass').value), ldgGrass: parseFloat(document.getElementById('ldgGrass').value), tkofSlope: parseFloat(document.getElementById('tkofSlope').value), ldgSlope: parseFloat(document.getElementById('ldgSlope').value) },
+                takeoff: [], landing: []
+            };
+            document.querySelectorAll('.perf-tkof-row').forEach(row => { newPerf.takeoff.push({ mass: parseFloat(row.querySelector('.row-mass').value), alt: parseFloat(row.querySelector('.row-alt').value), temp: parseFloat(row.querySelector('.row-temp').value), roll: parseFloat(row.querySelector('.row-roll').value), clear: parseFloat(row.querySelector('.row-clear').value) }); });
+            document.querySelectorAll('.perf-ldg-row').forEach(row => { newPerf.landing.push({ mass: parseFloat(row.querySelector('.row-mass').value), alt: parseFloat(row.querySelector('.row-alt').value), temp: parseFloat(row.querySelector('.row-temp').value), roll: parseFloat(row.querySelector('.row-roll').value), clear: parseFloat(row.querySelector('.row-clear').value) }); });
+            const existingIndex = perfModels.findIndex(m => m.id === newPerf.id); if(existingIndex >= 0) perfModels[existingIndex] = newPerf; else perfModels.push(newPerf);
+            saveData(); if (currentAircraftId) selectAircraft(currentAircraftId); alert("Modèle de performances enregistré !"); loadPerfProfile(newPerf.id);
+        }
+
+        function deletePerfProfile() {
+            if(confirm("Supprimer ce modèle de performance ?")) { perfModels = perfModels.filter(m => m.id !== editingPerfId); aircrafts.forEach(ac => { if(ac.modelId === editingPerfId) ac.modelId = null; }); saveData(); if (perfModels.length > 0) loadPerfProfile(perfModels[0].id); else createNewPerfProfile(); }
+        }
+
+        // ====== LOGIQUE ONGLET : PISTES ======
+        function populateRwSelect() {
+            const sel = document.getElementById('rwProfileSelect'); sel.innerHTML = '<option value="" disabled hidden>-- Nouvelle Piste --</option>';
+            runways.forEach(r => { const opt = document.createElement('option'); opt.value = r.id; opt.textContent = r.name; sel.appendChild(opt); });
+        }
+
+        function createNewRwProfile() {
+            editingRwId = 'rw_' + Date.now(); populateRwSelect(); document.getElementById('rwProfileSelect').value = '';
+            document.getElementById('editRwName').value = ''; document.getElementById('editRwSurface').value = 'dur'; document.getElementById('editRwSlope').value = 0;
+            ['editRwQfu1Name','editRwQfu1Toda','editRwQfu1Asda','editRwQfu1Lda','editRwQfu2Name','editRwQfu2Toda','editRwQfu2Asda','editRwQfu2Lda'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('btnDeleteRw').classList.add('hidden');
+        }
+
+        function loadRwProfile(id) {
+            const rw = runways.find(x => x.id === id); if(!rw) return;
+            editingRwId = rw.id; populateRwSelect(); document.getElementById('rwProfileSelect').value = rw.id;
+            document.getElementById('editRwName').value = rw.name; document.getElementById('editRwSurface').value = rw.surface; document.getElementById('editRwSlope').value = rw.slope;
+            document.getElementById('editRwQfu1Name').value = rw.qfu1.name; document.getElementById('editRwQfu1Toda').value = rw.qfu1.toda; document.getElementById('editRwQfu1Asda').value = rw.qfu1.asda; document.getElementById('editRwQfu1Lda').value = rw.qfu1.lda;
+            document.getElementById('editRwQfu2Name').value = rw.qfu2.name; document.getElementById('editRwQfu2Toda').value = rw.qfu2.toda; document.getElementById('editRwQfu2Asda').value = rw.qfu2.asda; document.getElementById('editRwQfu2Lda').value = rw.qfu2.lda;
+            document.getElementById('btnDeleteRw').classList.remove('hidden');
+        }
+
+        function saveRwProfile() {
+            const form = document.getElementById('rwForm'); if(!form.checkValidity()) { form.reportValidity(); return; }
+            const newRw = {
+                id: editingRwId, name: document.getElementById('editRwName').value, surface: document.getElementById('editRwSurface').value, slope: parseFloat(document.getElementById('editRwSlope').value),
+                qfu1: { name: document.getElementById('editRwQfu1Name').value, toda: parseInt(document.getElementById('editRwQfu1Toda').value), asda: parseInt(document.getElementById('editRwQfu1Asda').value), lda: parseInt(document.getElementById('editRwQfu1Lda').value) },
+                qfu2: { name: document.getElementById('editRwQfu2Name').value, toda: parseInt(document.getElementById('editRwQfu2Toda').value), asda: parseInt(document.getElementById('editRwQfu2Asda').value), lda: parseInt(document.getElementById('editRwQfu2Lda').value) }
+            };
+            const idx = runways.findIndex(r => r.id === newRw.id); if(idx >= 0) runways[idx] = newRw; else runways.push(newRw);
+            saveData(); populateRunwayDropdowns(); alert("Piste enregistrée !"); loadRwProfile(newRw.id);
+        }
+
+        function deleteRwProfile() {
+            if(confirm("Supprimer cette piste ?")) { runways = runways.filter(r => r.id !== editingRwId); saveData(); populateRunwayDropdowns(); if (runways.length > 0) loadRwProfile(runways[0].id); else createNewRwProfile(); }
+        }
+
+        // ====== LOGIQUE ONGLET : DONNEES ======
+        function exportData() {
+            const dataStr = JSON.stringify({ aircrafts: aircrafts, perfModels: perfModels, runways: runways }, null, 2);
+            const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([dataStr], { type: "application/json" }));
+            a.download = `aerocalc_backup_${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        }
+
+        function handleImport(event) {
+            const file = event.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imp = JSON.parse(e.target.result);
+                    if (imp.aircrafts && imp.perfModels) {
+                        if(confirm("Écraser toutes vos données actuelles ?")) {
+                            aircrafts = imp.aircrafts; perfModels = imp.perfModels; runways = imp.runways || []; saveData();
+                            populateAircraftSelect(); populateRunwayDropdowns(); if(aircrafts.length > 0) selectAircraft(aircrafts[0].id); alert("Données importées !"); closeProfileModal();
+                        }
+                    } else alert("Fichier invalide.");
+                } catch (err) { alert("Erreur de lecture du JSON."); }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function resetData() {
+            if(confirm("TOUT effacer et restaurer par défaut ? Irréversible.")) {
+                localStorage.removeItem('aeroCalcProfiles'); localStorage.removeItem('aeroCalcPerfModels'); localStorage.removeItem('aeroCalcRunways');
+                loadData(); populateAircraftSelect(); populateRunwayDropdowns(); if(aircrafts.length > 0) selectAircraft(aircrafts[0].id); alert("Réinitialisé."); closeProfileModal();
+            }
+        }
+    </script>
+</body>
+</html>
